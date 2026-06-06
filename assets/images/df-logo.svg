@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none">
+  <defs>
+    <linearGradient id="dfmg" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%"   stop-color="#f5c8d4"/>
+      <stop offset="40%"  stop-color="#c4808c"/>
+      <stop offset="100%" stop-color="#964060"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Semicircle arc (dome — top half only) -->
+  <path d="M 28,106 A 92,92 0 0,1 212,106"
+        stroke="url(#dfmg)" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- DF italic serif monogram -->
+  <text x="120" y="108"
+        font-family="Playfair Display, Georgia, serif"
+        font-size="82" font-weight="700" font-style="italic"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="url(#dfmg)">DF</text>
+
+  <!-- MEDIA — spaced capitals below -->
+  <text x="120" y="164"
+        font-family="Playfair Display, Georgia, serif"
+        font-size="13.5" font-weight="400" letter-spacing="13"
+        text-anchor="middle"
+        fill="url(#dfmg)">MEDIA</text>
+</svg>

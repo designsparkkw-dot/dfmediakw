@@ -1,0 +1,13 @@
+{
+  "name": "df-media",
+  "version": "1.0.0",
+  "description": "DF Media — advertising agency website",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "build:ar": "node build-ar.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
