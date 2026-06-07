@@ -2163,6 +2163,14 @@ body { animation: pageIn 0.45s var(--expo) both; }
   .wg-card { aspect-ratio: 9/16; }
 }
 
+/* The centered nav group + right-side actions only have room to coexist
+   above ~1024px — below that they start to overlap, so switch to the
+   hamburger menu earlier than the general mobile breakpoint. */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .nav-links, .nav-contact { display: none; }
+  .hamburger { display: flex; }
+}
+
 @media (max-width: 768px) {
   /* Hide custom cursor on touch devices */
   .cursor { display: none !important; }
