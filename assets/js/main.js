@@ -450,23 +450,81 @@ function splitWords(el) {
   });
 })();
 
-/* ── CONTACT FORM ──────────────────────────────────────────── */
+/* ── LEAD FORM ─────────────────────────────────────────────── */
 (function () {
   const form = document.getElementById('contact-form');
   if (!form) return;
 
+  const btn      = form.querySelector('[type="submit"]');
+  const label    = btn.querySelector('.btn-label');
+  const fields   = form.querySelectorAll('.form-field input, .form-field select, .form-field textarea');
+  const origText = label ? label.textContent : btn.textContent;
+
+  const setLabel = txt => { if (label) label.textContent = txt; else btn.textContent = txt; };
+
+  /* Animated focus glow — each field gets a soft, theme-coloured halo that
+     scales in from its label on focus, echoing the site's cinematic-lens motif */
+  fields.forEach(field => {
+    const wrap = field.closest('.form-field');
+    if (!wrap || wrap.querySelector('.form-field-glow')) return;
+    const glow = document.createElement('span');
+    glow.className = 'form-field-glow';
+    wrap.appendChild(glow);
+
+    field.addEventListener('focus', () => {
+      gsap.fromTo(glow,
+        { opacity: 0, scaleX: 0.6 },
+        { opacity: 1, scaleX: 1, duration: 0.55, ease: 'power3.out', transformOrigin: 'left center' }
+      );
+      gsap.to(wrap, { y: -2, duration: 0.35, ease: 'power2.out' });
+    });
+    field.addEventListener('blur', () => {
+      gsap.to(glow, { opacity: 0, duration: 0.4, ease: 'power2.in' });
+      gsap.to(wrap, { y: 0, duration: 0.4, ease: 'power2.out' });
+    });
+  });
+
   form.addEventListener('submit', e => {
     e.preventDefault();
-    const btn  = form.querySelector('[type="submit"]');
-    const orig = btn.textContent;
-    btn.textContent = 'Sending...';
+    if (btn.disabled) return;
     btn.disabled = true;
 
-    setTimeout(() => {
-      btn.textContent = 'Message sent';
-      btn.style.cssText = 'background:rgba(196,128,140,0.1);color:var(--accent);border-color:rgba(196,128,140,0.3)';
-      setTimeout(() => { btn.textContent = orig; btn.disabled = false; btn.style.cssText = ''; form.reset(); }, 5000);
-    }, 1400);
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+    // 1. Button morphs into a "sending" state with a pulsing dot trio
+    tl.to(btn, { scale: 0.97, duration: 0.18, ease: 'power2.in' })
+      .to(btn, { scale: 1, duration: 0.4, ease: 'elastic.out(1, 0.5)' })
+      .add(() => setLabel('Sending'))
+      .add(() => btn.classList.add('is-sending'))
+
+      // 2. Fields softly dim — like a shutter closing — while the request "processes"
+      .to(form.querySelectorAll('.form-field'), {
+        opacity: 0.45, duration: 0.5, stagger: 0.03, ease: 'power2.inOut'
+      }, '<')
+
+      // 3. Success — button flips to the accent gradient, fields glow back in
+      .add(() => {
+        btn.classList.remove('is-sending');
+        btn.classList.add('is-sent');
+        setLabel('Message Sent');
+      }, '+=1.1')
+      .fromTo(btn, { '--sent-wipe': '0%' }, { '--sent-wipe': '100%', duration: 0.6, ease: 'power3.out' }, '<')
+      .to(form.querySelectorAll('.form-field'), {
+        opacity: 1, duration: 0.6, stagger: 0.03, ease: 'power2.out'
+      }, '<0.1')
+      .fromTo('.lead-form-success', { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '<0.1')
+
+      // 4. Reset everything for another go
+      .add(() => {
+        setTimeout(() => {
+          gsap.to('.lead-form-success', { autoAlpha: 0, y: 10, duration: 0.4, ease: 'power2.in' });
+          btn.classList.remove('is-sent');
+          btn.style.removeProperty('--sent-wipe');
+          setLabel(origText);
+          btn.disabled = false;
+          form.reset();
+        }, 4200);
+      });
   });
 })();
 
