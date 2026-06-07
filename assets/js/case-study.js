@@ -45,10 +45,21 @@
     activeOverlay = overlay;
     overlay.scrollTop = 0;
 
-    // Kick off any showcase video in the hero so it's already
-    // playing on loop by the time the overlay reveals
+    // Kick off any showcase video in the hero — played here, synchronously
+    // inside the click handler's call stack, so the browser treats it as
+    // a user-gesture-initiated play and allows audio (no `muted` needed)
     const heroVideo = overlay.querySelector('.cso-hero-video');
-    if (heroVideo) heroVideo.play().catch(() => {});
+    if (heroVideo) {
+      heroVideo.muted = false;
+      heroVideo.currentTime = 0;
+      const playWithSound = () => heroVideo.play().catch(() => {
+        // Autoplay-with-sound was blocked (e.g. gesture not recognised) —
+        // fall back to a muted autoplay so the video still runs
+        heroVideo.muted = true;
+        heroVideo.play().catch(() => {});
+      });
+      playWithSound();
+    }
 
     lockScroll();
 
