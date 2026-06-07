@@ -518,7 +518,13 @@ body { background: var(--bg); min-height: 100vh; overflow-x: hidden; }
   letter-spacing: -0.03em;
 }
 
-.section-title em { font-style: italic; color: var(--accent); }
+.section-title em {
+  font-style: italic;
+  background: var(--accent-grad-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
 .view-all-link {
   display: inline-flex; align-items: center; gap: 10px;
