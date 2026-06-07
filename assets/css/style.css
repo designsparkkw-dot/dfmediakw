@@ -549,7 +549,7 @@ body { background: var(--bg); min-height: 100vh; overflow-x: hidden; }
   will-change: transform;
 }
 
-.wg-card { aspect-ratio: 9/16; }
+.wg-card { aspect-ratio: 4/5; }
 
 /* CTA snap card — mobile only */
 .wg-card--cta { display: none; }
@@ -2267,7 +2267,7 @@ body { animation: pageIn 0.45s var(--expo) both; }
   .portfolio-grid { grid-template-columns: repeat(2,1fr); }
   .portfolio-card.p-large { grid-column: span 1; aspect-ratio: 4/3; }
   .work-grid { grid-template-columns: repeat(2, 1fr); }
-  .wg-card { aspect-ratio: 9/16; }
+  .wg-card { aspect-ratio: 4/5; }
 }
 
 /* The centered nav group + right-side actions only have room to coexist
