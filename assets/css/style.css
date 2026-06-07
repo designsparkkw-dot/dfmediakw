@@ -2120,6 +2120,12 @@ body { background: var(--bg); min-height: 100vh; overflow-x: hidden; }
   max-width: 560px; margin-bottom: 48px;
 }
 
+/* The shared .page-label starts at opacity:0 and is revealed by the page-hero
+   GSAP script — but that only targets the first .page-label on the page.
+   This one is revealed by the .reveal/.visible scroll-observer on its parent
+   instead, so it needs to start visible. */
+.lead-form-head .page-label { opacity: 1; }
+
 .lead-form-sub {
   font-size: 0.92rem; font-weight: 300;
   color: var(--muted); line-height: 1.75;
