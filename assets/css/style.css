@@ -2907,6 +2907,16 @@ body { animation: pageIn 0.45s var(--expo) both; }
 
 @media (max-width: 768px) {
   .cso-hero { aspect-ratio: 16 / 9; }
+
+  /* Crack Restaurant hero photo — on small screens, shrink the image
+     to fit the banner instead of cropping it (cover), so the full
+     "CRACK!" lettering stays visible. The surrounding letterbox picks
+     up the photo's own blue tone so it blends in seamlessly. */
+  .cso-hero-img--crack {
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-color: #1c6f8c;
+  }
 }
 
 /* Overview strip — 4 columns */
