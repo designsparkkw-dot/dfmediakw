@@ -2365,6 +2365,12 @@ body { animation: pageIn 0.45s var(--expo) both; }
   box-shadow: 0 10px 36px rgba(196, 128, 140, 0.09);
 }
 
+.cm-channel--em:hover {
+  background: rgba(232, 168, 74, 0.07);
+  border-color: rgba(232, 168, 74, 0.26);
+  box-shadow: 0 10px 36px rgba(232, 168, 74, 0.09);
+}
+
 .cm-channel-icon {
   width: 50px; height: 50px; border-radius: 13px;
   display: flex; align-items: center; justify-content: center;
@@ -2373,6 +2379,7 @@ body { animation: pageIn 0.45s var(--expo) both; }
 
 .cm-channel--wa .cm-channel-icon { background: rgba(37, 211, 102, 0.1); color: #25D366; }
 .cm-channel--ig .cm-channel-icon { background: rgba(196, 128, 140, 0.12); color: var(--accent); }
+.cm-channel--em .cm-channel-icon { background: rgba(232, 168, 74, 0.12); color: var(--accent-2); }
 
 .cm-channel-text {
   flex: 1; display: flex; flex-direction: column; gap: 3px;
@@ -2414,7 +2421,7 @@ body { animation: pageIn 0.45s var(--expo) both; }
 }
 
 .contact-channels-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
 }
 
 .contact-channel-card {
@@ -2442,6 +2449,12 @@ body { animation: pageIn 0.45s var(--expo) both; }
   box-shadow: 0 24px 64px rgba(196, 128, 140, 0.07);
 }
 
+.contact-channel-card--em:hover {
+  background: rgba(232, 168, 74, 0.06);
+  border-color: rgba(232, 168, 74, 0.22);
+  box-shadow: 0 24px 64px rgba(232, 168, 74, 0.07);
+}
+
 .ccc-icon {
   width: 60px; height: 60px; border-radius: 17px;
   display: flex; align-items: center; justify-content: center;
@@ -2450,6 +2463,7 @@ body { animation: pageIn 0.45s var(--expo) both; }
 
 .contact-channel-card--wa .ccc-icon { background: rgba(37, 211, 102, 0.1); color: #25D366; }
 .contact-channel-card--ig .ccc-icon { background: rgba(196, 128, 140, 0.13); color: var(--accent); }
+.contact-channel-card--em .ccc-icon { background: rgba(232, 168, 74, 0.13); color: var(--accent-2); }
 
 .ccc-label {
   font-size: 0.6rem; font-weight: 500;
@@ -2480,9 +2494,14 @@ body { animation: pageIn 0.45s var(--expo) both; }
 
 .contact-channel-card--wa:hover .ccc-action { color: #25D366; gap: 13px; }
 .contact-channel-card--ig:hover .ccc-action { color: var(--accent); gap: 13px; }
+.contact-channel-card--em:hover .ccc-action { color: var(--accent-2); gap: 13px; }
 
 .ccc-action svg { flex-shrink: 0; transition: transform 0.38s var(--expo); }
 .contact-channel-card:hover .ccc-action svg { transform: translate(4px, -4px); }
+
+@media (max-width: 1024px) {
+  .contact-channels-grid { grid-template-columns: 1fr 1fr; }
+}
 
 @media (max-width: 768px) {
   .contact-channels-wrap { padding: 52px 20px 72px; }
