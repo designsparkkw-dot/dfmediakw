@@ -633,8 +633,19 @@ body { background: var(--bg); min-height: 100vh; overflow-x: hidden; }
 .wg-name {
   font-family: var(--font-d);
   font-size: clamp(1rem, 1.6vw, 1.45rem);
-  font-weight: 700; letter-spacing: -0.025em; line-height: 1.15;
+  font-weight: 700; font-style: italic; letter-spacing: -0.025em; line-height: 1.15;
   color: var(--fg);
+  transition: background 0.4s ease, -webkit-text-fill-color 0.4s ease;
+}
+
+/* On hover, the title fills with the site's signature accent gradient —
+   the same treatment used on case-study card names and emphasised
+   headline words across the theme. */
+.wg-card:hover .wg-name {
+  background: var(--accent-grad-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* Video-playing badge (top-right) */
