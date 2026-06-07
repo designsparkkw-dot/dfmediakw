@@ -247,6 +247,18 @@ function splitWords(el) {
     const video = card.querySelector('.wg-video');
     if (!video) return;
 
+    // Auto-playing showcase videos run continuously on loop from page load —
+    // leave them alone (don't pause/reset on mouse out like the hover-reveal ones)
+    if (video.classList.contains('wg-video--auto')) {
+      const tryPlay = () => video.play().catch(() => {});
+      tryPlay();
+      video.addEventListener('loadeddata', tryPlay, { once: true });
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) tryPlay();
+      });
+      return;
+    }
+
     card.addEventListener('mouseenter', () => {
       if (video.currentSrc && video.currentSrc !== window.location.href) {
         video.play().catch(() => {});

@@ -611,6 +611,10 @@ body { background: var(--bg); min-height: 100vh; overflow-x: hidden; }
 
 .wg-card:hover .wg-video { opacity: 1; }
 
+/* Autoplaying showcase video — always visible, plays continuously on loop
+   from the moment the page loads (rather than only revealing on hover) */
+.wg-video--auto { opacity: 1; }
+
 /* Info overlay */
 .wg-info {
   position: absolute; bottom: 0; left: 0; right: 0;
