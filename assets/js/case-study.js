@@ -45,22 +45,6 @@
     activeOverlay = overlay;
     overlay.scrollTop = 0;
 
-    // Kick off the sticky showcase video alongside the body copy — played
-    // here, synchronously inside the click handler's call stack, so the
-    // browser treats it as a user-gesture-initiated play and allows audio
-    const showcaseVideo = overlay.querySelector('.cso-body-video');
-    if (showcaseVideo) {
-      showcaseVideo.muted = false;
-      showcaseVideo.currentTime = 0;
-      const playWithSound = () => showcaseVideo.play().catch(() => {
-        // Autoplay-with-sound was blocked (e.g. gesture not recognised) —
-        // fall back to a muted autoplay so the video still runs
-        showcaseVideo.muted = true;
-        showcaseVideo.play().catch(() => {});
-      });
-      playWithSound();
-    }
-
     lockScroll();
 
     if (typeof gsap !== 'undefined') {
@@ -111,13 +95,6 @@
     if (!activeOverlay) return;
     const overlay = activeOverlay;
     activeOverlay = null;
-
-    // Pause the showcase video so it doesn't keep playing offscreen
-    const showcaseVideo = overlay.querySelector('.cso-body-video');
-    if (showcaseVideo) {
-      showcaseVideo.pause();
-      showcaseVideo.currentTime = 0;
-    }
 
     if (typeof gsap !== 'undefined' && !instant) {
       /* Roll up from the bottom — bar stays visible last, then snaps shut */
