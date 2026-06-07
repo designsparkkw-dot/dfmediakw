@@ -9,10 +9,10 @@
 
   /* ── CONFIG — update these when going live ───────────── */
   const WA_NUMBER = '96569094525';           // e.g. Kuwait: 96512345678
-  const IG_HANDLE = 'dfmedia';               // without @
+  const IG_HANDLE = 'dfmediakw';             // without @
   const EMAIL     = 'info@df-mediakw.com';
   const WA_URL    = `https://wa.me/${WA_NUMBER}`;
-  const IG_URL    = `https://instagram.com/${IG_HANDLE}`;
+  const IG_URL    = `https://www.instagram.com/${IG_HANDLE}/`;
   const EMAIL_URL = `mailto:${EMAIL}`;
 
   /* ── LANGUAGE DETECTION ──────────────────────────────── */
