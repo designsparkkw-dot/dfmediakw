@@ -665,10 +665,10 @@ body { background: var(--bg); min-height: 100vh; overflow-x: hidden; }
 
 /* Fade gradient at bottom of grid */
 .work-grid-fade {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  height: 160px;
-  background: linear-gradient(to top, var(--bg) 0%, var(--bg) 10%, rgba(8,8,8,0.6) 50%, transparent 100%);
-  pointer-events: none; z-index: 2;
+  /* Removed — this overlay sat directly on top of the card titles
+     ("Brand Film" / "Product Videography") and made them hard to read
+     once the cards became shorter. */
+  display: none;
 }
 
 /* See All Work CTA */
