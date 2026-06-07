@@ -241,6 +241,18 @@ function splitWords(el) {
   );
 })();
 
+/* ── CASE STUDY CARDS — AUTOPLAY SHOWCASE VIDEO ────────────── */
+(function () {
+  document.querySelectorAll('.cs-card-video').forEach(video => {
+    const tryPlay = () => video.play().catch(() => {});
+    tryPlay();
+    video.addEventListener('loadeddata', tryPlay, { once: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) tryPlay();
+    });
+  });
+})();
+
 /* ── WORK GRID — VIDEO ON HOVER ────────────────────────────── */
 (function () {
   document.querySelectorAll('.wg-card').forEach(card => {

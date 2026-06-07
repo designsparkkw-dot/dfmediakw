@@ -45,6 +45,11 @@
     activeOverlay = overlay;
     overlay.scrollTop = 0;
 
+    // Kick off any showcase video in the hero so it's already
+    // playing on loop by the time the overlay reveals
+    const heroVideo = overlay.querySelector('.cso-hero-video');
+    if (heroVideo) heroVideo.play().catch(() => {});
+
     lockScroll();
 
     if (typeof gsap !== 'undefined') {
@@ -95,6 +100,13 @@
     if (!activeOverlay) return;
     const overlay = activeOverlay;
     activeOverlay = null;
+
+    // Pause the hero showcase video so it doesn't keep playing offscreen
+    const heroVideo = overlay.querySelector('.cso-hero-video');
+    if (heroVideo) {
+      heroVideo.pause();
+      heroVideo.currentTime = 0;
+    }
 
     if (typeof gsap !== 'undefined' && !instant) {
       /* Roll up from the bottom — bar stays visible last, then snaps shut */

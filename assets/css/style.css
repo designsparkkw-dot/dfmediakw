@@ -2687,6 +2687,15 @@ body { animation: pageIn 0.45s var(--expo) both; }
 }
 .cs-card:hover .cs-card-img-bg { transform: scale(1.05); }
 
+/* Showcase video — plays on loop from page load, sits over the
+   gradient placeholder and scales gently with the card on hover */
+.cs-card-video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.95s var(--expo);
+}
+.cs-card:hover .cs-card-video { transform: scale(1.05); }
+
 /* Info half */
 .cs-card-info {
   grid-area: info;
@@ -2891,6 +2900,16 @@ body { animation: pageIn 0.45s var(--expo) both; }
   transform: scale(1.04);
   transition: transform 1.2s var(--expo);
 }
+
+/* Showcase video — plays on loop over the gradient placeholder,
+   shares the same gentle reveal-zoom as the static hero image */
+.cso-hero-video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  transform: scale(1.04);
+  transition: transform 1.2s var(--expo);
+}
+.cso.is-open .cso-hero-video { transform: scale(1); }
 .cso.is-open .cso-hero-img {
   transform: scale(1);
 }
