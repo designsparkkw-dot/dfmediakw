@@ -255,6 +255,20 @@ function splitWords(el) {
 
 /* ── WORK GRID — VIDEO ON HOVER ────────────────────────────── */
 (function () {
+  // iOS Safari can refuse to autoplay (or silently pause) a <video> while
+  // its card is still clip-path-hidden by the scroll-reveal animation —
+  // WebKit treats a fully clipped element as having zero visible area.
+  // Re-trigger play() the moment each showcase video's card actually
+  // scrolls into view so iOS picks it back up. Desktop browsers already
+  // play fine on load, so this is just a harmless extra nudge for them.
+  const autoVideoObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) entry.target.play().catch(() => {});
+        });
+      }, { threshold: 0.15 })
+    : null;
+
   document.querySelectorAll('.wg-card').forEach(card => {
     const video = card.querySelector('.wg-video');
     if (!video) return;
@@ -262,12 +276,18 @@ function splitWords(el) {
     // Auto-playing showcase videos run continuously on loop from page load —
     // leave them alone (don't pause/reset on mouse out like the hover-reveal ones)
     if (video.classList.contains('wg-video--auto')) {
+      // Belt-and-braces for iOS/WebKit — some versions only honour the
+      // `muted` IDL property (not just the HTML attribute) when deciding
+      // whether muted-autoplay is allowed.
+      video.muted = true;
+      video.setAttribute('muted', '');
       const tryPlay = () => video.play().catch(() => {});
       tryPlay();
       video.addEventListener('loadeddata', tryPlay, { once: true });
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) tryPlay();
       });
+      if (autoVideoObserver) autoVideoObserver.observe(video);
       return;
     }
 
