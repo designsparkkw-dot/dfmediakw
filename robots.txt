@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://df-mediakw.com/sitemap.xml
