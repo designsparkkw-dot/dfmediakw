@@ -49,16 +49,17 @@
     // here, synchronously inside the click handler's call stack, so the
     // browser treats it as a user-gesture-initiated play and allows audio
     const showcaseVideo = overlay.querySelector('.cso-body-video');
+    let playShowcaseWithSound = null;
     if (showcaseVideo) {
       showcaseVideo.muted = false;
       showcaseVideo.currentTime = 0;
-      const playWithSound = () => showcaseVideo.play().catch(() => {
+      playShowcaseWithSound = () => showcaseVideo.play().catch(() => {
         // Autoplay-with-sound was blocked (e.g. gesture not recognised) —
         // fall back to a muted autoplay so the video still runs
         showcaseVideo.muted = true;
         showcaseVideo.play().catch(() => {});
       });
-      playWithSound();
+      playShowcaseWithSound();
     }
 
     lockScroll();
@@ -80,6 +81,15 @@
         ease: ease,
         onStart() {
           overlay.style.pointerEvents = 'all';
+        },
+        onComplete() {
+          // Re-trigger play once the overlay (and the sticky video inside
+          // it) is fully revealed — mirrors the homepage showcase-video
+          // fix: iOS/WebKit can refuse to (un)muted-autoplay a <video>
+          // while its container is still clip-path-hidden and reports
+          // zero visible area. This still lands well within the click's
+          // "user activation" window, so audio keeps working.
+          if (playShowcaseWithSound) playShowcaseWithSound();
         },
       });
 
