@@ -2905,6 +2905,16 @@ body { animation: pageIn 0.45s var(--expo) both; }
   transform: scale(1);
 }
 
+/* Al Kayed Garage logo — shown at its natural aspect ratio inside the
+   wide hero banner instead of being stretched or cropped to fill it.
+   The letterbox picks up the artwork's own light background so the
+   logo sits cleanly without any harsh edges. */
+.cso-hero-img--alkayed {
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-color: #edeff1;
+}
+
 @media (max-width: 768px) {
   .cso-hero { aspect-ratio: 16 / 9; }
 
