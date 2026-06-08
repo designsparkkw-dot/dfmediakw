@@ -2913,6 +2913,13 @@ body { animation: pageIn 0.45s var(--expo) both; }
   background-size: contain;
   background-repeat: no-repeat;
   background-color: #edeff1;
+  /* Breathing room around the logo — background-size: contain measures
+     against the padding box, so this shrinks the artwork inward
+     instead of letting it touch the banner's edges. */
+  padding: clamp(40px, 9vw, 140px);
+  box-sizing: border-box;
+  background-origin: content-box;
+  background-clip: content-box;
 }
 
 @media (max-width: 768px) {
