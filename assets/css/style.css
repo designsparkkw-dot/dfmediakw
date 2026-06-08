@@ -2945,12 +2945,9 @@ body { animation: pageIn 0.45s var(--expo) both; }
 
 @media (max-width: 900px) {
   .cso-body-layout { flex-direction: column; }
-  .cso-body-media {
-    position: static;
-    width: 100%;
-    max-width: 320px;
-    margin: clamp(40px, 6vw, 80px) auto 0;
-  }
+  /* Hide the sticky showcase video on mobile/tablet — case-study body
+     content runs full width without it on smaller screens */
+  .cso-body-media { display: none; }
   .cso-body-layout .cso-body { padding-top: 32px; }
 }
 

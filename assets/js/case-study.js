@@ -50,7 +50,10 @@
     // browser treats it as a user-gesture-initiated play and allows audio
     const showcaseVideo = overlay.querySelector('.cso-body-video');
     let playShowcaseWithSound = null;
-    if (showcaseVideo) {
+    // The sticky showcase video is hidden (display: none) below the 900px
+    // breakpoint — don't even start it there, otherwise it'd keep playing
+    // (with audio) completely off-screen on mobile.
+    if (showcaseVideo && window.innerWidth > 900) {
       showcaseVideo.muted = false;
       showcaseVideo.currentTime = 0;
       playShowcaseWithSound = () => showcaseVideo.play().catch(() => {
