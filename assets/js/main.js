@@ -258,13 +258,31 @@ function splitWords(el) {
   // iOS Safari can refuse to autoplay (or silently pause) a <video> while
   // its card is still clip-path-hidden by the scroll-reveal animation —
   // WebKit treats a fully clipped element as having zero visible area.
-  // Re-trigger play() the moment each showcase video's card actually
-  // scrolls into view so iOS picks it back up. Desktop browsers already
-  // play fine on load, so this is just a harmless extra nudge for them.
+  // The card only crosses the IntersectionObserver threshold right as that
+  // ~1s clip-path reveal *starts*, so a single play() the moment it
+  // intersects can still land while the card is mostly clipped and get
+  // refused again. Instead, keep nudging play() every 200ms for a few
+  // seconds — by the time the reveal finishes, one of those nudges lands
+  // while the card is actually visible and iOS picks it up. Stops as soon
+  // as playback actually starts (or after ~4s so it doesn't run forever).
   const autoVideoObserver = 'IntersectionObserver' in window
     ? new IntersectionObserver(entries => {
         entries.forEach(entry => {
-          if (entry.isIntersecting) entry.target.play().catch(() => {});
+          if (!entry.isIntersecting) return;
+          const video = entry.target;
+          if (video.dataset.nudging) return;
+          video.dataset.nudging = '1';
+          let attempts = 0;
+          const nudge = () => {
+            if (!video.paused || ++attempts > 20) {
+              clearInterval(timer);
+              delete video.dataset.nudging;
+              return;
+            }
+            video.play().catch(() => {});
+          };
+          const timer = setInterval(nudge, 200);
+          nudge();
         });
       }, { threshold: 0.15 })
     : null;
