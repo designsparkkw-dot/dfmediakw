@@ -8,13 +8,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3456;
 
 // ── SMTP credentials ──────────────────────────────────────────────────────────
-// Loaded from contact-config.js which lives ONLY on the server (not in git).
+// Loaded from contact-config.json which lives ONLY on the server (not in git).
 // Create / edit that file via File Manager — see instructions below.
 let smtpConfig = null;
 try {
-  smtpConfig = await import('./contact-config.js');
+  const raw = fs.readFileSync(path.join(__dirname, 'contact-config.json'), 'utf8');
+  smtpConfig = JSON.parse(raw);
 } catch {
-  console.warn('[server] contact-config.js not found — email sending disabled until you create it on the server');
+  console.warn('[server] contact-config.json not found — email sending disabled until you create it on the server');
 }
 
 // ── MIME types ────────────────────────────────────────────────────────────────

@@ -3,3 +3,4 @@ node_modules/
 *.ps1
 # SMTP credentials — edit this file directly on the server via File Manager
 contact-config.js
+contact-config.json
