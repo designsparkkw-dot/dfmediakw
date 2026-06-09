@@ -124,7 +124,7 @@ const server = http.createServer(async (req, res) => {
 </table></td></tr></table></body></html>`;
 
       await transporter.sendMail({
-        from:    `"DF Media Website" <${smtpConfig.SMTP_USER}>`,
+        from:    `"DF Media Website" <${smtpConfig.SMTP_FROM || smtpConfig.SMTP_USER}>`,
         to:      smtpConfig.MAIL_TO,
         replyTo: email,
         subject: `New enquiry from ${name} - DF Media`,
