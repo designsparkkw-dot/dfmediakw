@@ -17,6 +17,13 @@ const MIME_TYPES = {
   '.ico':  'image/x-icon',
   '.woff2':'font/woff2',
   '.woff': 'font/woff',
+  // Video — must be correct or iOS Safari refuses to play
+  '.mp4':  'video/mp4',
+  '.webm': 'video/webm',
+  // SEO / manifest
+  '.xml':  'application/xml',
+  '.txt':  'text/plain',
+  '.webmanifest': 'application/manifest+json',
 };
 
 const server = http.createServer((req, res) => {
@@ -24,6 +31,44 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/') urlPath = '/index.html';
 
   const filePath = path.join(__dirname, urlPath);
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+  // Video files need byte-range (partial content) support.
+  // iOS Safari always sends a Range header before playing — without this
+  // it either refuses to play or stalls after a few seconds.
+  if (ext === '.mp4' || ext === '.webm') {
+    fs.stat(filePath, (err, stat) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Not Found');
+        return;
+      }
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      if (range) {
+        const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(startStr, 10);
+        const end   = endStr ? parseInt(endStr, 10) : fileSize - 1;
+        res.writeHead(206, {
+          'Content-Range':  `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges':  'bytes',
+          'Content-Length': end - start + 1,
+          'Content-Type':   contentType,
+        });
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Accept-Ranges':  'bytes',
+          'Content-Type':   contentType,
+        });
+        fs.createReadStream(filePath).pipe(res);
+      }
+    });
+    return;
+  }
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
@@ -31,9 +76,6 @@ const server = http.createServer((req, res) => {
       res.end('404 Not Found');
       return;
     }
-
-    const ext = path.extname(filePath);
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   });
