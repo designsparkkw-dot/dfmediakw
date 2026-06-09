@@ -239,7 +239,10 @@ function splitWords(el) {
   const cards = gsap.utils.toArray('.wg-card');
   if (!cards.length) return;
 
-  // Each card wipes in from bottom — cinematic staggered reveal
+  // Each card wipes in from bottom — cinematic staggered reveal.
+  // onComplete fires per-card the instant clip-path reaches inset(0 0 0% 0),
+  // meaning zero clipping — the ONLY safe moment to call play() on iOS,
+  // which refuses autoplay on elements with any non-zero clip-path inset.
   gsap.fromTo(cards,
     { clipPath: 'inset(0 0 100% 0)', opacity: 1 },
     {
@@ -247,21 +250,18 @@ function splitWords(el) {
       duration: 1.05,
       ease: 'power3.inOut',
       stagger: { each: 0.1, from: 'start' },
+      onComplete: function () {
+        var v = this.targets()[0].querySelector('.wg-video--auto');
+        if (!v) return;
+        v.muted = true;
+        v.play().catch(function () {});
+        // One extra attempt 400ms later — covers rare iOS decoder-init lag
+        setTimeout(function () { if (v.paused) v.play().catch(function () {}); }, 400);
+      },
       scrollTrigger: {
         trigger: '.work-grid',
         start: 'top 88%',
         toggleActions: 'play none none none',
-        // Guaranteed final nudge: after the stagger animation is done
-        // (1.05s duration + 0.1s stagger * card count) all cards are
-        // fully unclipped — any iOS play() calls that landed while still
-        // partially clipped can now succeed.
-        onEnter() {
-          gsap.delayedCall(1.3, function () {
-            document.querySelectorAll('.wg-video--auto').forEach(function (v) {
-              if (v.paused) { v.muted = true; v.play().catch(function () {}); }
-            });
-          });
-        }
       }
     }
   );
@@ -270,21 +270,33 @@ function splitWords(el) {
 /* ── CASE STUDY CARDS — AUTOPLAY SHOWCASE VIDEO ────────────── */
 (function () {
   document.querySelectorAll('.cs-card-video').forEach(function (video) {
-    // Explicitly set the IDL property — some iOS Safari versions ignore
-    // the muted HTML attribute and only respect video.muted = true in JS
+    // Explicitly set the muted IDL property — some iOS Safari versions
+    // ignore the HTML attribute and only respect the JS property
     video.muted = true;
     video.setAttribute('muted', '');
 
+    // Explicit load() call — ensures iOS starts buffering immediately
+    // instead of waiting for a scroll or user interaction to begin
+    video.load();
+
     var tryPlay = function () { video.play().catch(function () {}); };
-    tryPlay();
+
+    // canplay fires as soon as the browser can begin playback (earlier
+    // than canplaythrough); loadeddata is a belt-and-suspenders fallback
+    video.addEventListener('canplay',    tryPlay, { once: true });
     video.addEventListener('loadeddata', tryPlay, { once: true });
+
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) tryPlay();
+      if (!document.hidden && video.paused) tryPlay();
+    });
+    // pageshow fires when navigating back via Back button on iOS
+    window.addEventListener('pageshow', function () {
+      if (video.paused) tryPlay();
     });
 
-    // Nudge loop: keep retrying until playback actually starts.
-    // iOS WebKit can silently refuse the first several play() calls if the
-    // media decoder isn't ready yet or the element was loaded off-screen.
+    // Nudge loop: retries every 200ms for up to 6s until play starts.
+    // The cs-card is not inside any clip-path animation so these calls
+    // are safe — they simply wait for the media decoder to become ready.
     if (!video.dataset.nudging) {
       video.dataset.nudging = '1';
       var attempts = 0;
@@ -303,60 +315,31 @@ function splitWords(el) {
 
 /* ── WORK GRID — VIDEO ON HOVER ────────────────────────────── */
 (function () {
-  // iOS Safari can refuse to autoplay (or silently pause) a <video> while
-  // its card is still clip-path-hidden by the scroll-reveal animation —
-  // WebKit treats a fully clipped element as having zero visible area.
-  // The card only crosses the IntersectionObserver threshold right as that
-  // ~1s clip-path reveal *starts*, so a single play() the moment it
-  // intersects can still land while the card is mostly clipped and get
-  // refused again. Instead, keep nudging play() every 200ms for a few
-  // seconds — by the time the reveal finishes, one of those nudges lands
-  // while the card is actually visible and iOS picks it up. Stops as soon
-  // as playback actually starts (or after ~4s so it doesn't run forever).
-  const autoVideoObserver = 'IntersectionObserver' in window
-    ? new IntersectionObserver(entries => {
-        entries.forEach(entry => {
-          if (!entry.isIntersecting) return;
-          const video = entry.target;
-          if (video.dataset.nudging) return;
-          video.dataset.nudging = '1';
-          let attempts = 0;
-          const nudge = () => {
-            if (!video.paused || ++attempts > 30) {
-              clearInterval(timer);
-              delete video.dataset.nudging;
-              return;
-            }
-            video.play().catch(() => {});
-          };
-          const timer = setInterval(nudge, 200);
-          nudge();
-        });
-      }, { threshold: 0.15 })
-    : null;
+  // NOTE: wg-video--auto elements are played exclusively via the GSAP
+  // card-reveal onComplete (above), which fires after clip-path reaches
+  // inset(0 0 0% 0). Do NOT call play() here or via IntersectionObserver —
+  // early calls while the card is still clip-path-hidden cause iOS Safari
+  // to "blacklist" the video for the session, blocking all later play().
 
   document.querySelectorAll('.wg-card').forEach(card => {
     const video = card.querySelector('.wg-video');
     if (!video) return;
 
-    // Auto-playing showcase videos run continuously on loop from page load —
-    // leave them alone (don't pause/reset on mouse out like the hover-reveal ones)
     if (video.classList.contains('wg-video--auto')) {
-      // Belt-and-braces for iOS/WebKit — some versions only honour the
-      // `muted` IDL property (not just the HTML attribute) when deciding
-      // whether muted-autoplay is allowed.
+      // Set the muted IDL property now; play() is called from GSAP onComplete
       video.muted = true;
       video.setAttribute('muted', '');
-      const tryPlay = () => video.play().catch(() => {});
-      tryPlay();
-      video.addEventListener('loadeddata', tryPlay, { once: true });
+      // Re-play if user returns from another tab or app
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) tryPlay();
+        if (!document.hidden && video.paused) { video.muted = true; video.play().catch(() => {}); }
       });
-      if (autoVideoObserver) autoVideoObserver.observe(video);
+      window.addEventListener('pageshow', () => {
+        if (video.paused) { video.muted = true; video.play().catch(() => {}); }
+      });
       return;
     }
 
+    // Hover-only videos (desktop) — play on mouseenter, reset on leave
     card.addEventListener('mouseenter', () => {
       if (video.currentSrc && video.currentSrc !== window.location.href) {
         video.play().catch(() => {});
