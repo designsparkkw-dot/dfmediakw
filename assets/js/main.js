@@ -577,47 +577,81 @@ function splitWords(el) {
     });
   });
 
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     if (btn.disabled) return;
     btn.disabled = true;
 
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    // Collect form values
+    const payload = {
+      name:    (document.getElementById('lf-name')?.value    || '').trim(),
+      email:   (document.getElementById('lf-email')?.value   || '').trim(),
+      phone:   (document.getElementById('lf-phone')?.value   || '').trim(),
+      service: (document.getElementById('lf-service')?.value || '').trim(),
+      message: (document.getElementById('lf-message')?.value || '').trim(),
+    };
 
-    // 1. Button morphs into a "sending" state with a pulsing dot trio
-    tl.to(btn, { scale: 0.97, duration: 0.18, ease: 'power2.in' })
-      .to(btn, { scale: 1, duration: 0.4, ease: 'elastic.out(1, 0.5)' })
-      .add(() => setLabel('Sending'))
-      .add(() => btn.classList.add('is-sending'))
+    // Phase 1 — animate button into "sending" state, then await so the
+    //            spinner stays visible while the HTTP request is in-flight
+    await new Promise(resolve => {
+      gsap.timeline({ onComplete: resolve, defaults: { ease: 'power3.out' } })
+        // Button pulse
+        .to(btn, { scale: 0.97, duration: 0.18, ease: 'power2.in' })
+        .to(btn, { scale: 1,    duration: 0.4,  ease: 'elastic.out(1, 0.5)' })
+        .add(() => { setLabel('Sending'); btn.classList.add('is-sending'); })
+        // Fields softly dim while the request processes
+        .to(form.querySelectorAll('.form-field'), {
+          opacity: 0.45, duration: 0.5, stagger: 0.03, ease: 'power2.inOut',
+        }, '<');
+    });
 
-      // 2. Fields softly dim — like a shutter closing — while the request "processes"
-      .to(form.querySelectorAll('.form-field'), {
-        opacity: 0.45, duration: 0.5, stagger: 0.03, ease: 'power2.inOut'
-      }, '<')
-
-      // 3. Success — button flips to the accent gradient, fields glow back in
-      .add(() => {
-        btn.classList.remove('is-sending');
-        btn.classList.add('is-sent');
-        setLabel('Message Sent');
-      }, '+=1.1')
-      .fromTo(btn, { '--sent-wipe': '0%' }, { '--sent-wipe': '100%', duration: 0.6, ease: 'power3.out' }, '<')
-      .to(form.querySelectorAll('.form-field'), {
-        opacity: 1, duration: 0.6, stagger: 0.03, ease: 'power2.out'
-      }, '<0.1')
-      .fromTo('.lead-form-success', { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '<0.1')
-
-      // 4. Reset everything for another go
-      .add(() => {
-        setTimeout(() => {
-          gsap.to('.lead-form-success', { autoAlpha: 0, y: 10, duration: 0.4, ease: 'power2.in' });
-          btn.classList.remove('is-sent');
-          btn.style.removeProperty('--sent-wipe');
-          setLabel(origText);
-          btn.disabled = false;
-          form.reset();
-        }, 4200);
+    // Phase 2 — fire the actual API request
+    let ok = false;
+    try {
+      const res = await fetch('/api/contact', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
       });
+      ok = res.ok;
+    } catch (_) {
+      ok = false;
+    }
+
+    // Phase 3a — SUCCESS: button flips to accent gradient, fields glow back in
+    if (ok) {
+      gsap.timeline({ defaults: { ease: 'power3.out' } })
+        .add(() => {
+          btn.classList.remove('is-sending');
+          btn.classList.add('is-sent');
+          setLabel('Message Sent');
+        })
+        .fromTo(btn, { '--sent-wipe': '0%' }, { '--sent-wipe': '100%', duration: 0.6, ease: 'power3.out' }, '<')
+        .to(form.querySelectorAll('.form-field'), {
+          opacity: 1, duration: 0.6, stagger: 0.03, ease: 'power2.out',
+        }, '<0.1')
+        .fromTo('.lead-form-success', { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '<0.1')
+        // Reset everything after a moment so the form is usable again
+        .add(() => {
+          setTimeout(() => {
+            gsap.to('.lead-form-success', { autoAlpha: 0, y: 10, duration: 0.4, ease: 'power2.in' });
+            btn.classList.remove('is-sent');
+            btn.style.removeProperty('--sent-wipe');
+            setLabel(origText);
+            btn.disabled = false;
+            form.reset();
+          }, 4200);
+        });
+
+    // Phase 3b — ERROR: restore fields so the user can try again
+    } else {
+      gsap.to(form.querySelectorAll('.form-field'), {
+        opacity: 1, duration: 0.4, ease: 'power2.out',
+      });
+      btn.classList.remove('is-sending');
+      setLabel('Failed — Try Again');
+      btn.disabled = false;
+    }
   });
 })();
 
