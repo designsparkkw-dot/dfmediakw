@@ -1,21 +1,21 @@
-import http from 'http';
-import tls  from 'tls';
-import fs   from 'fs';
-import path from 'path';
+import http       from 'http';
+import fs         from 'fs';
+import path       from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3456;
 
 // ── SMTP credentials ──────────────────────────────────────────────────────────
 // Loaded from contact-config.json which lives ONLY on the server (not in git).
-// Create / edit that file via File Manager — see instructions below.
+// Create / edit that file via File Manager or terminal.
 let smtpConfig = null;
 try {
   const raw = fs.readFileSync(path.join(__dirname, 'contact-config.json'), 'utf8');
   smtpConfig = JSON.parse(raw);
 } catch {
-  console.warn('[server] contact-config.json not found — email sending disabled until you create it on the server');
+  console.warn('[server] contact-config.json not found — email sending disabled');
 }
 
 // ── MIME types ────────────────────────────────────────────────────────────────
@@ -30,102 +30,12 @@ const MIME_TYPES = {
   '.ico':  'image/x-icon',
   '.woff2':'font/woff2',
   '.woff': 'font/woff',
-  // Video — must be correct or iOS Safari refuses to play
   '.mp4':  'video/mp4',
   '.webm': 'video/webm',
-  // SEO / manifest
   '.xml':  'application/xml',
   '.txt':  'text/plain',
   '.webmanifest': 'application/manifest+json',
 };
-
-// ── Minimal SMTP-over-TLS client (no npm packages needed) ────────────────────
-function sendSmtp({ host, port = 465, user, pass, from, to, replyTo, subject, html }) {
-  return new Promise((resolve, reject) => {
-    const b64 = s => Buffer.from(String(s)).toString('base64');
-
-    let buf   = '';
-    let stage = 'greeting';
-
-    const socket = tls.connect({ host, port, servername: host }, () => {});
-
-    socket.setTimeout(20000, () => {
-      socket.destroy();
-      reject(new Error('SMTP timeout'));
-    });
-    socket.on('error', err => reject(err));
-
-    socket.on('data', chunk => {
-      buf += chunk.toString();
-      const lines = buf.split('\r\n');
-      buf = lines.pop();
-
-      for (const line of lines) {
-        if (!line) continue;
-        const code    = parseInt(line.slice(0, 3), 10);
-        const isFinal = line[3] === ' ';
-        if (!isFinal) continue;
-
-        switch (stage) {
-          case 'greeting':
-            if (code === 220) { socket.write('EHLO localhost\r\n'); stage = 'ehlo'; }
-            else { socket.destroy(); reject(new Error(`Greeting: ${line}`)); }
-            break;
-          case 'ehlo':
-            if (code === 250) { socket.write('AUTH LOGIN\r\n'); stage = 'auth-init'; }
-            else { socket.destroy(); reject(new Error(`EHLO: ${line}`)); }
-            break;
-          case 'auth-init':
-            if (code === 334) { socket.write(b64(user) + '\r\n'); stage = 'auth-user'; }
-            else { socket.destroy(); reject(new Error(`AUTH LOGIN: ${line}`)); }
-            break;
-          case 'auth-user':
-            if (code === 334) { socket.write(b64(pass) + '\r\n'); stage = 'auth-pass'; }
-            else { socket.destroy(); reject(new Error(`Auth user: ${line}`)); }
-            break;
-          case 'auth-pass':
-            if (code === 235) { socket.write(`MAIL FROM:<${from}>\r\n`); stage = 'mail-from'; }
-            else { socket.destroy(); reject(new Error(`Auth failed — check password: ${line}`)); }
-            break;
-          case 'mail-from':
-            if (code === 250) { socket.write(`RCPT TO:<${to}>\r\n`); stage = 'rcpt-to'; }
-            else { socket.destroy(); reject(new Error(`MAIL FROM: ${line}`)); }
-            break;
-          case 'rcpt-to':
-            if (code === 250) { socket.write('DATA\r\n'); stage = 'data-cmd'; }
-            else { socket.destroy(); reject(new Error(`RCPT TO: ${line}`)); }
-            break;
-          case 'data-cmd':
-            if (code === 354) {
-              const body = html.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
-              const msg  = [
-                `From: "DF Media Website" <${from}>`,
-                `To: ${to}`,
-                `Reply-To: ${replyTo || from}`,
-                `Subject: ${subject}`,
-                `MIME-Version: 1.0`,
-                `Content-Type: text/html; charset=utf-8`,
-                ``,
-                body,
-                `\r\n.\r\n`,
-              ].join('\r\n');
-              socket.write(msg);
-              stage = 'data-body';
-            } else { socket.destroy(); reject(new Error(`DATA cmd: ${line}`)); }
-            break;
-          case 'data-body':
-            if (code === 250) { socket.write('QUIT\r\n'); stage = 'quit'; }
-            else { socket.destroy(); reject(new Error(`Message rejected: ${line}`)); }
-            break;
-          case 'quit':
-            socket.destroy();
-            resolve();
-            break;
-        }
-      }
-    });
-  });
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function readBody(req) {
@@ -168,6 +78,16 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const transporter = nodemailer.createTransport({
+        host:   smtpConfig.SMTP_HOST,
+        port:   smtpConfig.SMTP_PORT,
+        secure: smtpConfig.SMTP_PORT === 465,
+        auth: {
+          user: smtpConfig.SMTP_USER,
+          pass: smtpConfig.SMTP_PASS,
+        },
+      });
+
       const htmlBody = `
 <!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,sans-serif;">
@@ -203,23 +123,20 @@ const server = http.createServer(async (req, res) => {
   </td></tr>
 </table></td></tr></table></body></html>`;
 
-      await sendSmtp({
-        host:    smtpConfig.SMTP_HOST,
-        port:    smtpConfig.SMTP_PORT,
-        user:    smtpConfig.SMTP_USER,
-        pass:    smtpConfig.SMTP_PASS,
-        from:    smtpConfig.SMTP_USER,
+      await transporter.sendMail({
+        from:    `"DF Media Website" <${smtpConfig.SMTP_USER}>`,
         to:      smtpConfig.MAIL_TO,
         replyTo: email,
-        subject: `New enquiry from ${name} — DF Media`,
+        subject: `New enquiry from ${name} - DF Media`,
         html:    htmlBody,
+        text:    `Name: ${name}\nEmail: ${email}\nPhone: ${phone || '—'}\nService: ${service || '—'}\n\nMessage:\n${message || '—'}`,
       });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
 
     } catch (err) {
-      console.error('[contact] SMTP error:', err.message);
+      console.error('[contact] sendMail error:', err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Failed to send. Please try again.' }));
     }
@@ -233,7 +150,6 @@ const server = http.createServer(async (req, res) => {
   const ext      = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-  // Video files need byte-range support — iOS Safari always sends Range headers
   if (ext === '.mp4' || ext === '.webm') {
     fs.stat(filePath, (err, stat) => {
       if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404 Not Found'); return; }
