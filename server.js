@@ -1,8 +1,8 @@
 import http from 'http';
-import fs from 'fs';
+import tls  from 'tls';
+import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import nodemailer from 'nodemailer';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3456;
@@ -27,19 +27,108 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json',
 };
 
-// ── Nodemailer transporter (Hostinger SMTP) ───────────────────────────────────
-// Set SMTP_USER and SMTP_PASS as environment variables in Hostinger's
-// Node.js settings panel (hPanel → Hosting → Node.js → Environment Variables).
-// SMTP_USER is typically the same address you're sending FROM: info@df-mediakw.com
-const transporter = nodemailer.createTransport({
-  host: 'smtp.hostinger.com',
-  port: 465,
-  secure: true,           // SSL on port 465
-  auth: {
-    user: process.env.SMTP_USER || 'info@df-mediakw.com',
-    pass: process.env.SMTP_PASS,   // set this in Hostinger env vars
-  },
-});
+// ── Minimal SMTP-over-TLS client (no npm packages needed) ────────────────────
+// Uses Node.js built-in `tls` module to talk directly to Hostinger's SMTP.
+// Supports AUTH LOGIN (base64 user/pass) on port 465 (implicit TLS).
+function sendSmtp({ host, port = 465, user, pass, from, to, replyTo, subject, html, text }) {
+  return new Promise((resolve, reject) => {
+    const b64 = s => Buffer.from(String(s)).toString('base64');
+
+    let buf   = '';
+    let stage = 'greeting';
+
+    const socket = tls.connect({ host, port, servername: host }, () => {
+      // Connected — wait for server greeting in the 'data' handler
+    });
+
+    socket.setTimeout(20000, () => {
+      socket.destroy();
+      reject(new Error('SMTP timeout'));
+    });
+    socket.on('error', err => reject(err));
+
+    socket.on('data', chunk => {
+      buf += chunk.toString();
+      // Responses may arrive in multiple TCP packets; process complete lines only
+      const lines = buf.split('\r\n');
+      buf = lines.pop();           // keep any incomplete trailing fragment
+
+      for (const line of lines) {
+        if (!line) continue;
+        const code    = parseInt(line.slice(0, 3), 10);
+        const isFinal = line[3] === ' '; // multi-line responses use '-', final uses ' '
+        if (!isFinal) continue;          // skip continuation lines
+
+        switch (stage) {
+          case 'greeting':
+            if (code === 220) { socket.write('EHLO localhost\r\n'); stage = 'ehlo'; }
+            else { socket.destroy(); reject(new Error(`SMTP greeting: ${line}`)); }
+            break;
+
+          case 'ehlo':
+            if (code === 250) { socket.write('AUTH LOGIN\r\n'); stage = 'auth-init'; }
+            else { socket.destroy(); reject(new Error(`EHLO: ${line}`)); }
+            break;
+
+          case 'auth-init':
+            if (code === 334) { socket.write(b64(user) + '\r\n'); stage = 'auth-user'; }
+            else { socket.destroy(); reject(new Error(`AUTH LOGIN: ${line}`)); }
+            break;
+
+          case 'auth-user':
+            if (code === 334) { socket.write(b64(pass) + '\r\n'); stage = 'auth-pass'; }
+            else { socket.destroy(); reject(new Error(`Auth user: ${line}`)); }
+            break;
+
+          case 'auth-pass':
+            if (code === 235) { socket.write(`MAIL FROM:<${from}>\r\n`); stage = 'mail-from'; }
+            else { socket.destroy(); reject(new Error(`Auth failed (check password): ${line}`)); }
+            break;
+
+          case 'mail-from':
+            if (code === 250) { socket.write(`RCPT TO:<${to}>\r\n`); stage = 'rcpt-to'; }
+            else { socket.destroy(); reject(new Error(`MAIL FROM: ${line}`)); }
+            break;
+
+          case 'rcpt-to':
+            if (code === 250) { socket.write('DATA\r\n'); stage = 'data-cmd'; }
+            else { socket.destroy(); reject(new Error(`RCPT TO: ${line}`)); }
+            break;
+
+          case 'data-cmd':
+            if (code === 354) {
+              // Build RFC 2822 message. Dot-stuff any lines that start with '.'
+              const body = html.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+              const msg  = [
+                `From: "DF Media Website" <${from}>`,
+                `To: ${to}`,
+                `Reply-To: ${replyTo || from}`,
+                `Subject: ${subject}`,
+                `MIME-Version: 1.0`,
+                `Content-Type: text/html; charset=utf-8`,
+                ``,
+                body,
+                `\r\n.\r\n`,
+              ].join('\r\n');
+              socket.write(msg);
+              stage = 'data-body';
+            } else { socket.destroy(); reject(new Error(`DATA cmd: ${line}`)); }
+            break;
+
+          case 'data-body':
+            if (code === 250) { socket.write('QUIT\r\n'); stage = 'quit'; }
+            else { socket.destroy(); reject(new Error(`Message rejected: ${line}`)); }
+            break;
+
+          case 'quit':
+            socket.destroy();
+            resolve();
+            break;
+        }
+      }
+    });
+  });
+}
 
 // ── Helper: collect POST body ────────────────────────────────────────────────
 function readBody(req) {
@@ -54,7 +143,7 @@ function readBody(req) {
   });
 }
 
-// ── Helper: sanitise a plain-text value for HTML email ──────────────────────
+// ── Helper: sanitise a plain-text value for use inside HTML ─────────────────
 function esc(str) {
   return String(str || '')
     .replace(/&/g, '&amp;')
@@ -80,12 +169,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const mailOptions = {
-        from:    `"DF Media Website" <${process.env.SMTP_USER || 'info@df-mediakw.com'}>`,
-        to:      'info@df-mediakw.com',
-        replyTo: email,
-        subject: `New enquiry from ${esc(name)} — DF Media`,
-        html: `
+      const smtpUser = process.env.SMTP_USER || 'info@df-mediakw.com';
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (!smtpPass) {
+        console.error('[contact] SMTP_PASS env var is not set');
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Server email not configured.' }));
+        return;
+      }
+
+      const htmlBody = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -94,7 +188,6 @@ const server = http.createServer(async (req, res) => {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
 
-        <!-- Header -->
         <tr>
           <td style="background:#0a0a0a;padding:32px 40px;">
             <p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:.5px;">DF Media</p>
@@ -102,7 +195,6 @@ const server = http.createServer(async (req, res) => {
           </td>
         </tr>
 
-        <!-- Body -->
         <tr>
           <td style="padding:36px 40px;">
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -138,10 +230,9 @@ const server = http.createServer(async (req, res) => {
           </td>
         </tr>
 
-        <!-- Footer -->
         <tr>
           <td style="background:#f9f9f9;padding:20px 40px;border-top:1px solid #eee;">
-            <p style="margin:0;color:#aaa;font-size:12px;">This message was sent from the contact form at df-mediakw.com</p>
+            <p style="margin:0;color:#aaa;font-size:12px;">Sent from the contact form at df-mediakw.com</p>
           </td>
         </tr>
 
@@ -149,27 +240,25 @@ const server = http.createServer(async (req, res) => {
     </td></tr>
   </table>
 </body>
-</html>`,
-        text: [
-          `New enquiry — DF Media`,
-          ``,
-          `Name:    ${name}`,
-          `Email:   ${email}`,
-          `Phone:   ${phone || '—'}`,
-          `Service: ${service || '—'}`,
-          ``,
-          `Message:`,
-          message || '—',
-        ].join('\n'),
-      };
+</html>`;
 
-      await transporter.sendMail(mailOptions);
+      await sendSmtp({
+        host:    'smtp.hostinger.com',
+        port:    465,
+        user:    smtpUser,
+        pass:    smtpPass,
+        from:    smtpUser,
+        to:      'info@df-mediakw.com',
+        replyTo: email,
+        subject: `New enquiry from ${name} — DF Media`,
+        html:    htmlBody,
+      });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
 
     } catch (err) {
-      console.error('[contact] sendMail error:', err.message);
+      console.error('[contact] SMTP error:', err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Failed to send. Please try again.' }));
     }
@@ -194,7 +283,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const fileSize = stat.size;
-      const range = req.headers.range;
+      const range    = req.headers.range;
 
       if (range) {
         const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
