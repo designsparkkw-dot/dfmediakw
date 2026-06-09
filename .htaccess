@@ -3,6 +3,8 @@
 # application/octet-stream, which causes Google Search Console to
 # report "Couldn't fetch" when submitting the sitemap.
 <IfModule mod_mime.c>
+  AddType video/mp4  .mp4
+  AddType video/webm .webm
   AddType application/xml .xml
   AddType text/xml .xml
   AddType text/plain .txt
