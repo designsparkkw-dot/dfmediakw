@@ -5,6 +5,21 @@
 
 gsap.registerPlugin(ScrollTrigger);
 
+/* ── iOS MUTED-VIDEO AUTOPLAY UNLOCK ───────────────────────── */
+// iOS Safari sometimes suspends media elements until the user has touched
+// the page, even for muted+playsinline videos (e.g. when the page was
+// opened via a link or loaded in the background). A single touchstart on
+// any part of the page "unlocks" all media elements site-wide so that
+// subsequent play() calls succeed without requiring another gesture.
+(function () {
+  document.addEventListener('touchstart', function () {
+    document.querySelectorAll('video[playsinline]').forEach(function (v) {
+      v.muted = true; // ensure IDL property is set, not just the HTML attr
+      if (v.paused && v.currentSrc) v.play().catch(function () {});
+    });
+  }, { once: true, passive: true });
+})();
+
 /* ── CURSOR ────────────────────────────────────────────────── */
 (function initCursor() {
   const cursor = document.querySelector('.cursor');
@@ -236,6 +251,17 @@ function splitWords(el) {
         trigger: '.work-grid',
         start: 'top 88%',
         toggleActions: 'play none none none',
+        // Guaranteed final nudge: after the stagger animation is done
+        // (1.05s duration + 0.1s stagger * card count) all cards are
+        // fully unclipped — any iOS play() calls that landed while still
+        // partially clipped can now succeed.
+        onEnter() {
+          gsap.delayedCall(1.3, function () {
+            document.querySelectorAll('.wg-video--auto').forEach(function (v) {
+              if (v.paused) { v.muted = true; v.play().catch(function () {}); }
+            });
+          });
+        }
       }
     }
   );
@@ -243,13 +269,35 @@ function splitWords(el) {
 
 /* ── CASE STUDY CARDS — AUTOPLAY SHOWCASE VIDEO ────────────── */
 (function () {
-  document.querySelectorAll('.cs-card-video').forEach(video => {
-    const tryPlay = () => video.play().catch(() => {});
+  document.querySelectorAll('.cs-card-video').forEach(function (video) {
+    // Explicitly set the IDL property — some iOS Safari versions ignore
+    // the muted HTML attribute and only respect video.muted = true in JS
+    video.muted = true;
+    video.setAttribute('muted', '');
+
+    var tryPlay = function () { video.play().catch(function () {}); };
     tryPlay();
     video.addEventListener('loadeddata', tryPlay, { once: true });
-    document.addEventListener('visibilitychange', () => {
+    document.addEventListener('visibilitychange', function () {
       if (!document.hidden) tryPlay();
     });
+
+    // Nudge loop: keep retrying until playback actually starts.
+    // iOS WebKit can silently refuse the first several play() calls if the
+    // media decoder isn't ready yet or the element was loaded off-screen.
+    if (!video.dataset.nudging) {
+      video.dataset.nudging = '1';
+      var attempts = 0;
+      var nudge = function () {
+        if (!video.paused || ++attempts > 30) {
+          clearInterval(timer);
+          delete video.dataset.nudging;
+          return;
+        }
+        video.play().catch(function () {});
+      };
+      var timer = setInterval(nudge, 200);
+    }
   });
 })();
 
@@ -274,7 +322,7 @@ function splitWords(el) {
           video.dataset.nudging = '1';
           let attempts = 0;
           const nudge = () => {
-            if (!video.paused || ++attempts > 20) {
+            if (!video.paused || ++attempts > 30) {
               clearInterval(timer);
               delete video.dataset.nudging;
               return;
